@@ -173,21 +173,13 @@ def draw_pads(cr):
 	cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
 	cr.set_source_rgba(160/255., 160/255., 0.0, 0.8)
 
-	cr.save()
 	cr.rectangle(-1000 - 700/2, -700/2, 700, 700)
-	cr.new_sub_path()
 	cr.arc(-1000, 0, 400/2, 0, 2 * math.pi)
-	cr.clip()
-	cr.rectangle(-1000 - 700/2, -700/2, 700, 700); cr.fill()
-	cr.restore()
+	cr.fill()
 
-	cr.save()
-	cr.rectangle(1000 - 700/2, -700/2, 700, 700)
-	cr.new_sub_path()
+	cr.arc(1000, 0, 700/2, 0, 2 * math.pi)
 	cr.arc(1000, 0, 400/2, 0, 2 * math.pi)
-	cr.clip()
-	cr.arc(1000, 0, 700/2, 0, 2 * math.pi); cr.fill()
-	cr.restore()
+	cr.fill()
 
 # GTK mumbo-jumbo to show the widget in a window and quit when it's closed
 def run(Widget):

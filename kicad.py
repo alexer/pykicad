@@ -319,9 +319,17 @@ class Module(Section):
 	section_name = 'MODULE'
 	def __init__(self):
 		self.name = None
+		self.position = self.orientation = self.layer = self.last_edit_time = self.locked = self.placed = None
+		self.libref = None
+		self.doc = None
+		self.kws = None
 		self.timestamp = None
+		self.path = None
+		self.r90 = self.r180 = self.xxx1 = None
+		self.attrs = None
 		self.reference = None
 		self.value = None
+		self.text2 = None
 		self.draws = []
 		self.pads = []
 		self.shape3d = None
@@ -443,7 +451,8 @@ class Module(Section):
 			draw.dump()
 		for pad in self.pads:
 			pad.dump()
-		self.shape3d.dump()
+		if self.shape3d:
+			self.shape3d.dump()
 
 class ModuleLibrary(Section):
 	section_name = 'LIBRARY'

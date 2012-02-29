@@ -224,23 +224,29 @@ def draw_pads(cr, pads):
 	cr.set_source_rgba(160/255., 160/255., 0.0, 0.8)
 
 	for pad in pads:
+		cr.save()
+		cr.translate(pad.position[0], pad.position[1])
+		cr.rotate(-math.radians(pad.orientation/10.))
+		cr.translate(-pad.position[0], -pad.position[1])
+		pad_center = pad.position[0] + pad.drill_offset[0], pad.position[1] + pad.drill_offset[1]
 		if pad.shape == 'rectangle':
-			cr.rectangle(pad.position[0] - pad.size[0]/2., pad.position[1] - pad.size[1]/2., pad.size[0], pad.size[1])
+			cr.rectangle(pad_center[0] - pad.size[0]/2., pad_center[1] - pad.size[1]/2., pad.size[0], pad.size[1])
 		elif pad.shape == 'circle':
 			assert pad.size[0] == pad.size[1]
-			cr.arc(pad.position[0], pad.position[1], pad.size[0]/2., 0, 2 * math.pi)
+			cr.arc(pad_center[0], pad_center[1], pad.size[0]/2., 0, 2 * math.pi)
 		elif pad.shape == 'oval':
 			r = min(pad.size)/2.
 			xsize = max(0, pad.size[0] - pad.size[1])
 			ysize = max(0, pad.size[1] - pad.size[0])
-			cr.move_to(pad.position[0] - pad.size[0]/2., pad.position[1] + ysize/2.)
-			cr.arc(pad.position[0] - xsize/2., pad.position[1] - ysize/2., r, math.pi, 3 * math.pi/2.)
-			cr.arc(pad.position[0] + xsize/2., pad.position[1] - ysize/2., r, 3 * math.pi/2., 2 * math.pi)
-			cr.arc(pad.position[0] + xsize/2., pad.position[1] + ysize/2., r, 0, math.pi/2.)
-			cr.arc(pad.position[0] - xsize/2., pad.position[1] + ysize/2., r, math.pi/2., math.pi)
+			cr.move_to(pad_center[0] - pad.size[0]/2., pad_center[1] + ysize/2.)
+			cr.arc(pad_center[0] - xsize/2., pad_center[1] - ysize/2., r, math.pi, 3 * math.pi/2.)
+			cr.arc(pad_center[0] + xsize/2., pad_center[1] - ysize/2., r, 3 * math.pi/2., 2 * math.pi)
+			cr.arc(pad_center[0] + xsize/2., pad_center[1] + ysize/2., r, 0, math.pi/2.)
+			cr.arc(pad_center[0] - xsize/2., pad_center[1] + ysize/2., r, math.pi/2., math.pi)
 			cr.new_sub_path()
 		else:
 			raise ValueError, 'Unknown shape'
+		cr.restore()
 		cr.arc(pad.position[0], pad.position[1], pad.drill_size/2., 0, 2 * math.pi)
 		cr.fill()
 

@@ -174,12 +174,12 @@ def iter_module_points(mod):
 			yield min(x1, x2) - item.width, min(y1, y2) - item.width
 			yield max(x1, x2) + item.width, max(y1, y2) + item.width
 		elif isinstance(item, kicad.DrawCircle):
-			r = math.sqrt(item.outline[0]**2 + item.outline[1]**2)
+			r = math.sqrt((item.center[0]-item.outline[0])**2 + (item.center[1]-item.outline[1])**2)
 			yield item.center[0] - r - item.width, item.center[1] - r - item.width
 			yield item.center[0] + r + item.width, item.center[1] + r + item.width
 		elif isinstance(item, kicad.DrawArc):
 			item.dump()
-			r = math.sqrt(item.start[0]**2 + item.start[1]**2)
+			r = math.sqrt((item.center[0]-item.start[0])**2 + (item.center[1]-item.start[1])**2)
 			yield item.center[0] - r - item.width, item.center[1] - r - item.width
 			yield item.center[0] + r + item.width, item.center[1] + r + item.width
 		else:
@@ -209,8 +209,9 @@ def draw_silk(cr, items):
 		elif isinstance(item, kicad.DrawCircle):
 			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.outline[0])**2 + (item.center[1]-item.outline[1])**2), 0, 2 * math.pi)
 		elif isinstance(item, kicad.DrawArc):
-			start_angle = math.atan2(item.start[1], item.start[0])
-			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.start[0])**2 + (item.center[1]-item.start[1])**2), start_angle, math.radians(item.angle/10.))
+			start_angle = math.atan2(item.start[1]-item.center[1], item.start[0]-item.center[0])
+			print item.center, item.start, math.degrees(start_angle)
+			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.start[0])**2 + (item.center[1]-item.start[1])**2), start_angle, start_angle + math.radians(item.angle/10.))
 		else:
 			raise TypeError, 'Unknown shape'
 		cr.stroke()

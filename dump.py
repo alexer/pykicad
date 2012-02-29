@@ -107,224 +107,389 @@ def get_layers_from_mask(mask):
 	return names
 
 
-def dump_mod_index(f, ):
-	print 'Index / Modules contained in this file:'
-	while True:
-		line = f.readline()
-		if not line:
-			print 'Unexpected EOF'
-			sys.exit(1)
-		line = line.rstrip('\n')
-		if line == '$EndINDEX':
-			break
-		print '- ', line
+class Instruction:
+	@classmethod
+	def load(cls, f, *args):
+		section = cls()
+		try:
+			section._load(f, *args)
+		except:
+			print 'In', cls.__name__
+			raise
+		return section
 
-def dump_mod_module_position(f, pos_x, pos_y, orientation, layer, last_edit_time, timestamp_, status_txt):
-	print '- Position on board:', int(pos_x), int(pos_y)
-	print '- Orientation: %.1f°' % (float(orientation)/10, )
-	print '- Layer:', int(layer), layer_names[int(layer)]
-	print '- Last edit time:', timestamp(int(last_edit_time, 16))
-	print '- Timestamp used for logical links (???):', timestamp(int(timestamp_, 16))
-	print '- Status:', ', '.join(({'F': 'Locked', '~': 'Not Locked'}[status_txt[0]], {'F': 'Placed', '~': 'Not Placed'}[status_txt[1]]))
-	assert len(status_txt) == 2
+class Section(Instruction):
+	section_name = None
+	loaders = None
+	default_loader = None
+	def _init(self, *args):
+		assert args == ('$' + self.section_name, )
 
-def dump_mod_module_libref(f, libref):
-	print '- Library reference:', libref
+	def _fini(self, *args):
+		assert args == ('$End' + self.section_name, )
 
-def dump_mod_module_doc(f, *doc):
-	print '- Module description:', ' '.join(doc)
+	def _load(self, f, *args):
+		self._init(*args)
+		while True:
+			line = f.readline()
+			if not line:
+				print 'Unexpected EOF'
+				sys.exit(1)
+			line = line.rstrip('\n').split(None)
+			if line[0] == '$End' + self.section_name:
+				self._fini(*line)
+				break
+			loader = self.loaders.get(line[0], self.default_loader)
+			if not loader:
+				print 'Unknown section:', line[0]
+				sys.exit(1)
+			try:
+				self._handle(loader(f, *line))
+			except:
+				print 'Handling', line
+				raise
 
-def dump_mod_module_keyword(f, kw):
-	print '- Keywords to select the module in library:', kw
+	def _handle(self, result):
+		assert result is None
 
-def dump_mod_module_timestamp(f, timestamp_):
-	print '- Timestamp used for logical links AGAIN (???):', timestamp(int(timestamp_, 16))
 
-def dump_mod_module_path(f, *path):
-	print '- AR (???) / Path (???):', ' '.join(path)
+class Index(Section):
+	section_name = 'INDEX'
+	loaders = {}
+	def __init__(self):
+		self.module_names = []
 
-def dump_mod_module_cntrot(f, r90, r180, xxx):
-	print '- Automatic placement costs:'
-	print '  - 90 degrees rotation (Horizontal <-> Vertical):', r90
-	print '  - 180 degrees rotation (UP <-> Down):', r180
-	print '  - ???:', xxx
+	def default_loader(self, f, *line):
+		self.module_names.append(' '.join(line))
 
-def dump_mod_module_texte(title):
-	def dumper(f, pos_x, pos_y, size_y, size_x, orient, thickness, mirror, visibility, layer, style, *text):
+	def dump(self):
+		print 'Index:'
+		for name in self.module_names:
+			print '-', name
+
+class Pad(Section):
+	section_name = 'PAD'
+	def __init__(self):
+		self.loaders = {
+			'Sh': self._load_shape,
+			'Dr': self._load_drill,
+			'At': self._load_attribute,
+			'Ne': self._load_net,
+			'Po': self._load_position,
+		}
+
+	def _load_shape(self, f, _op, name, shape, size_x, size_y, dsize_x, dsize_y, orient):
+		self.name = name
+		self.shape = {'C': 'circle', 'R': 'rectangle', 'O': 'oval', 'T': 'trapezoid'}[shape]
+		self.size = int(size_x), int(size_y)
+		self.dsize = int(dsize_x), int(dsize_y)
+		self.orientation = int(orient)
+
+	def _load_drill(self, f, _op, drill_x, offset_x, offset_y):
+		self.drill_offset = int(offset_x), int(offset_y)
+		self.drill_size = int(drill_x)
+
+	def _load_attribute(self, f, _op, type_, xxx_, layer_mask):
+		self.type = type_
+		self.layer_mask = int(layer_mask, 16)
+		assert xxx_ == 'N'
+
+	def _load_net(self, f, _op, net, net_name):
+		self.net = int(net)
+		self.net_name = net_name
+
+	def _load_position(self, f, _op, pos_x, pos_y):
+		self.position = int(pos_x), int(pos_y)
+
+	def dump(self):
+		print '* Pad:'
+		print '  - Name:', self.name
+		print '  - Shape:', self.shape
+		print '  - Size:', self.size
+		print '  - Delta size:', self.dsize
+		print '  - Orientation: %.1f°' % (self.orientation / 10., )
+		print '  - Drill: Offset:', self.drill_offset, 'Width (???):', self.drill_size
+		print '  - Type:', {'STD': 'Standard', 'SMD': 'SMD', 'CONN': 'Conn (???)', 'HOLE': 'Hole (not plated)'}[self.type]
+		print '  - Layer mask:', '%08X' % (self.layer_mask, ), ', '.join(get_layers_from_mask(self.layer_mask))
+		print '  - Net: Number:', self.net, 'Name:', self.net_name
+		print '  - Position:', self.position
+
+class Shape3D(Section):
+	section_name = 'SHAPE3D'
+	def __init__(self):
+		self.name = None
+		self.scale = None
+		self.offset = None
+		self.rotation = None
+		self.loaders = {
+			'Na': self._load_name,
+			'Sc': self._load_scale,
+			'Of': self._load_offset,
+			'Ro': self._load_rotation,
+		}
+
+	def _load_name(self, f, _op, *name):
+		assert self.name is None
+		self.name = ' '.join(name)
+
+	def _get_3d_loader(name):
+		def loader(self, f, _op, *values):
+			assert getattr(self, name) is None
+			assert len(values) == 3
+			setattr(self, name, map(float, values))
+		return loader
+	_load_scale = _get_3d_loader('scale')
+	_load_offset = _get_3d_loader('offset')
+	_load_rotation = _get_3d_loader('rotation')
+
+	def dump(self):
+		print '* 3D shape:'
+		print '  - Name:', self.name
+		for name in 'scale offset rotation'.split():
+			print '  - %s:' % (name.title(), ), getattr(self, name)
+
+class Texte(Instruction):
+	def __init__(self, name):
+		self.name = name
+
+	def _load(self, f, _op, pos_x, pos_y, size_y, size_x, orient, thickness, mirror, visibility, layer, style, *text):
 		ind = style.find('"')
 		if len(style) > 1 and ind >= 0:
 			assert ind in (0, 1)
 			style, text = style[:ind], (style[ind:], ) + text
-		print '- Module', title, 'text:', ' '.join(text)
-		print '  - Position:', pos_x, pos_y
-		print '  - Size:', size_x, size_y
-		print '  - Orientation: %.1f°' % (float(orient) / 10, )
-		print '  - Thickness:', thickness
-		print '  - Style:', ', '.join(({'V': 'Visible', 'I': 'Invisible'}[visibility], {'M': 'Mirrored', 'N': 'Not Mirrored'}[mirror], {'I': 'Italic', 'N': 'Normal', '': 'Unspecified'}[style]))
-		print '  - Layer:', int(layer), layer_names[int(layer)]
-	return dumper
+		self.text = ' '.join(text)
+		self.position = int(pos_x), int(pos_y)
+		self.size = int(size_x), int(size_y)
+		self.orientation = int(orient)
+		self.thickness = int(thickness)
+		self.visible = {'V': True, 'I': False}[visibility]
+		self.mirrored = {'M': True, 'N': False}[mirror]
+		self.style = {'I': 'italic', 'N': 'normal', '': None}[style]
+		self.layer = int(layer)
 
-def dump_mod_module_segment(f, x1, y1, x2, y2, width, layer):
-	print '- Line; from %r to %r, line width %d, layer' % ((int(x1), int(y1)), (int(x2), int(y2)), int(width)), int(layer), layer_names[int(layer)]
+	@staticmethod
+	def get_loader(name):
+		def loader(f, *args):
+			item = Texte(name)
+			item._load(f, *args)
+			return item
+		return loader
 
-def dump_mod_module_circle(f, x1, y1, x2, y2, width, layer):
-	print '- Circle; center at %r, outline at %r, line width %d, layer' % ((int(x1), int(y1)), (int(x2), int(y2)), int(width)), int(layer), layer_names[int(layer)]
+	def dump(self):
+		print '-', self.name.title(), 'text:', self.text
+		print '  - Position:', self.position
+		print '  - Size:', self.size
+		print '  - Orientation: %.1f°' % (self.orientation / 10., )
+		print '  - Thickness:', self.thickness
+		print '  - Style:', ', '.join(({True: 'Visible', False: 'Invisible'}[self.visible], {True: 'Mirrored', False: 'Not Mirrored'}[self.mirrored], (self.style or 'unspecified').title()))
+		print '  - Layer:', self.layer, layer_names[self.layer]
 
-def dump_mod_module_arc(f, x1, y1, x2, y2, angle, width, layer):
-	print '- Arc; center at %r, arc starts at %r, arc size %.1f°, line width %d, layer' % ((int(x1), int(y1)), (int(x2), int(y2)), float(angle) / 10, int(width)), int(layer), layer_names[int(layer)]
+class DrawSegment(Instruction):
+	def _load(self, f, _op, x1, y1, x2, y2, width, layer):
+		self.p1 = int(x1), int(y1)
+		self.p2 = int(x2), int(y2)
+		self.width = int(width)
+		self.layer = int(layer)
 
-def dump_mod_module_pad_shape(f, name, shape, size_x, size_y, dsize_x, dsize_y, orient):
-	print '  - Name:', name
-	print '  - Shape:', {'C': 'circle', 'R': 'rectangle', 'O': 'oval', 'T': 'trapezoid'}[shape]
-	print '  - Size:', size_x, size_y
-	print '  - Delta size:', dsize_x, dsize_y
-	print '  - Orientation: %.1f°' % (float(orient) / 10, )
+	def dump(self):
+		print '- Line; from %r to %r, line width %d, layer' % (self.p1, self.p2, self.width), self.layer, layer_names[self.layer]
 
-def dump_mod_module_pad_drill(f, drill_x, offset_x, offset_y):
-	print '  - Drill: Offset:', offset_x, offset_y, 'Width (???):', drill_x
+class DrawCircle(Instruction):
+	def _load(self, f, _op, x1, y1, x2, y2, width, layer):
+		self.center = int(x1), int(y1)
+		self.outline = int(x2), int(y2)
+		self.width = int(width)
+		self.layer = int(layer)
 
-def dump_mod_module_pad_attribute(f, type_, xxx_, layer_mask):
-	print '  - Type:', {'STD': 'Standard', 'SMD': 'SMD', 'CONN': 'Conn (???)', 'HOLE': 'Hole (not plated)'}[type_]
-	assert xxx_ == 'N'
-	print '  - Layer mask:', layer_mask, ', '.join(get_layers_from_mask(int(layer_mask, 16)))
+	def dump(self):
+		print '- Circle; center at %r, outline at %r, line width %d, layer' % (self.center, self.outline, self.width), self.layer, layer_names[self.layer]
 
-def dump_mod_module_pad_net(f, net, net_name):
-	print '  - Net: Number:', net, 'Name:', net_name
+class DrawArc(Instruction):
+	def _load(self, f, _op, x1, y1, x2, y2, angle, width, layer):
+		self.center = int(x1), int(y1)
+		self.start = int(x2), int(y2)
+		self.angle = int(angle)
+		self.width = int(width)
+		self.layer = int(layer)
 
-def dump_mod_module_pad_position(f, pos_x, pos_y):
-	print '  - Position:', pos_x, pos_y
+	def dump(self):
+		print '- Arc; center at %r, arc starts at %r, arc size %.1f°, line width %d, layer' % (self.center, self.outline, self.angle / 10., self.width), self.layer, layer_names[self.layer]
 
-mod_module_pad_dumpers = {
-	'Sh': dump_mod_module_pad_shape,
-	'Dr': dump_mod_module_pad_drill,
-	'At': dump_mod_module_pad_attribute,
-	'Ne': dump_mod_module_pad_net,
-	'Po': dump_mod_module_pad_position,
-}
+class Module(Section):
+	section_name = 'MODULE'
+	def __init__(self):
+		self.name = None
+		self.timestamp = None
+		self.reference = None
+		self.value = None
+		self.draws = []
+		self.pads = []
+		self.shape3d = None
+		self.loaders = {
+			'Po': self._load_position,
+			'Li': self._load_libref,
+			'Cd': self._load_doc,
+			'Kw': self._load_keyword,
+			'Sc': self._load_timestamp,
+			'AR': self._load_path,
+			'Op': self._load_cntrot,
+			'T0': self._load_reference,
+			'T1': self._load_value,
+			'DS': self._load_segment,
+			'DC': self._load_circle,
+			'DA': self._load_arc,
+			'$PAD': Pad.load,
+			'$SHAPE3D': Shape3D.load,
+		}
 
-def dump_mod_module_pad(f):
-	print '- Definition for pad:'
-	while True:
-		line = f.readline()
-		if not line:
-			print 'Unexpected EOF'
-			sys.exit(1)
-		line = line.rstrip('\n').split(None)
-		if line[0] == '$EndPAD':
-			break
-		mod_module_pad_dumper = mod_module_pad_dumpers.get(line[0])
-		if not mod_module_pad_dumper:
-			print 'Unknown section:', line[0]
-			sys.exit(1)
-		mod_module_pad_dumper(f, *line[1:])
+	def _init(self, clsname, name):
+		Section._init(self, clsname)
+		self.name = name
 
-def dump_mod_module_shape3d_name(f, *name):
-	print '  - Name:', ' '.join(name)
+	def _fini(self, endname, name):
+		Section._fini(self, endname)
+		assert name == self.name
 
-def dump_mod_module_shape3d_3d(title):
-	def dumper(f, x, y, z):
-		print '  - %s:' % (title.title(), ), x, y, z
-	return dumper
+	def _handle(self, result):
+		if result is None:
+			return
+		elif isinstance(result, Pad):
+			self.pads.append(result)
+		elif isinstance(result, Shape3D):
+			assert self.shape3d is None
+			self.shape3d = result
+		else:
+			raise
 
-mod_module_shape3d_dumpers = {
-	'Na': dump_mod_module_shape3d_name,
-	'Sc': dump_mod_module_shape3d_3d('scale'),
-	'Of': dump_mod_module_shape3d_3d('offset'),
-	'Ro': dump_mod_module_shape3d_3d('rotation'),
-}
+	def _load_position(self, f, _op, pos_x, pos_y, orientation, layer, last_edit_time, timestamp_, status_txt):
+		self.position = int(pos_x), int(pos_y)
+		self.orientation = int(orientation)
+		self.layer = int(layer)
+		self.last_edit_time = int(last_edit_time, 16)
+		if self.timestamp is None:
+			self.timestamp = int(timestamp_, 16)
+		else:
+			assert self.timestamp == int(timestamp_, 16)
+		self.locked = {'F': True, '~': False}[status_txt[0]]
+		self.placed = {'F': True, '~': False}[status_txt[1]]
+		assert len(status_txt) == 2
 
-def dump_mod_module_shape3d(f):
-	print '- Definition for 3d shape:'
-	while True:
-		line = f.readline()
-		if not line:
-			print 'Unexpected EOF'
-			sys.exit(1)
-		line = line.rstrip('\n').split(None)
-		if line[0] == '$EndSHAPE3D':
-			break
-		mod_module_shape3d_dumper = mod_module_shape3d_dumpers.get(line[0])
-		if not mod_module_shape3d_dumper:
-			print 'Unknown section:', line[0]
-			sys.exit(1)
-		mod_module_shape3d_dumper(f, *line[1:])
+	def _load_libref(self, f, _op, libref):
+		self.libref = libref
 
-mod_module_dumpers = {
-	'Po': dump_mod_module_position,
-	'Li': dump_mod_module_libref,
-	'Cd': dump_mod_module_doc,
-	'Kw': dump_mod_module_keyword,
-	'Sc': dump_mod_module_timestamp,
-	'AR': dump_mod_module_path,
-	'Op': dump_mod_module_cntrot,
-	'T0': dump_mod_module_texte('reference'),
-	'T1': dump_mod_module_texte('value'),
-	'DS': dump_mod_module_segment,
-	'DC': dump_mod_module_circle,
-	'DA': dump_mod_module_arc,
-	'$PAD': dump_mod_module_pad,
-	'$SHAPE3D': dump_mod_module_shape3d,
-}
+	def _load_doc(self, f, _op, *doc):
+		self.doc = ' '.join(doc)
 
-def dump_mod_module(f, name):
-	print 'Definition for module %s:' % (name, )
-	while True:
-		line = f.readline()
-		if not line:
-			print 'Unexpected EOF'
-			sys.exit(1)
-		line = line.rstrip('\n').split(None)
-		if line[0] == '$EndMODULE':
-			assert line[1] == name
-			break
-		mod_module_dumper = mod_module_dumpers.get(line[0])
-		if not mod_module_dumper:
-			print 'Unknown section:', line[0]
-			sys.exit(1)
-		mod_module_dumper(f, *line[1:])
+	def _load_keyword(self, f, _op, kw):
+		self.kw = kw
 
-def dump_mod_end(f):
-	line = f.readline()
-	assert line == ''
+	def _load_timestamp(self, f, _op, timestamp_):
+		if self.timestamp is None:
+			self.timestamp = int(timestamp_, 16)
+		else:
+			assert self.timestamp == int(timestamp_, 16)
 
-mod_dumpers = {
-	'$INDEX': dump_mod_index,
-	'$MODULE': dump_mod_module,
-	'$EndLIBRARY': dump_mod_end,
-}
+	def _load_path(self, f, _op, *path):
+		self.path = ' '.join(path)
 
-def dump_mod(f):
+	def _load_cntrot(self, f, _op, r90, r180, xxx):
+		self.r90 = r90
+		self.r180 = r180
+		self.xxx1 = xxx
+
+	def _get_texte_loader(name):
+		def loader(self, f, *args):
+			assert getattr(self, name) is None
+			setattr(self, name, Texte.get_loader(name)(f, *args))
+		return loader
+	_load_reference = _get_texte_loader('reference')
+	_load_value = _get_texte_loader('value')
+
+	def _load_segment(self, f, *args):
+		self.draws.append(DrawSegment.load(f, *args))
+
+	def _load_circle(self, f, *args):
+		self.draws.append(DrawCircle.load(f, *args))
+
+	def _load_arc(self, f, *args):
+		self.draws.append(DrawArc.load(f, *args))
+
+	def dump(self):
+		print 'Module:', self.name
+		print '- Position on board:', self.position
+		print '- Orientation: %.1f°' % (self.orientation/10., )
+		print '- Layer:', self.layer, layer_names[self.layer]
+		print '- Last edit time:', timestamp(self.last_edit_time)
+		print '- Timestamp used for logical links (???):', timestamp(self.timestamp)
+		print '- Status:', ', '.join(({True: 'Locked', False: 'Not Locked'}[self.locked], {True: 'Placed', False: 'Not Placed'}[self.placed]))
+		print '- Library reference:', self.libref
+		print '- Module description:', self.doc
+		print '- Keywords to select the module in library:', self.kw
+		print '- AR (???) / Path (???):', self.path
+		print '- Automatic placement costs:'
+		print '  - 90 degrees rotation (Horizontal <-> Vertical):', self.r90
+		print '  - 180 degrees rotation (UP <-> Down):', self.r180
+		print '  - ???:', self.xxx1
+		self.reference.dump()
+		self.value.dump()
+		for draw in self.draws:
+			draw.dump()
+		for pad in self.pads:
+			pad.dump()
+		self.shape3d.dump()
+
+class ModuleLibrary(Section):
+	section_name = 'LIBRARY'
+	loaders = {
+		'$INDEX': Index.load,
+		'$MODULE': Module.load,
+	}
+	def __init__(self):
+		self.index = None
+		self.modules = []
+
+	def _handle(self, result):
+		if isinstance(result, Index):
+			assert self.index is None
+			self.index = result
+		elif isinstance(result, Module):
+			self.modules.append(result)
+		else:
+			raise
+
+	def dump(self):
+		self.index.dump()
+		for module in self.modules:
+			module.dump()
+
+def load_mod(f):
 	header = f.readline().rstrip('\n')
 	magic, created = header.split(None, 1)
 	assert magic == 'PCBNEW-LibModule-V1'
 	print 'Creation time:', created
-	while True:
-		line = f.readline()
-		if not line:
-			break
-		line = line.rstrip('\n').split(None)
-		mod_dumper = mod_dumpers.get(line[0])
-		if not mod_dumper:
-			print 'Unknown section:', line[0]
-			sys.exit(1)
-		mod_dumper(f, *line[1:])
+	result = ModuleLibrary.load(f, '$LIBRARY')
+	line = f.readline()
+	assert line == ''
+	return result
 
-dumpers = {
-	'mod': dump_mod,
+loaders = {
+	'mod': load_mod,
 }
 
-if len(sys.argv) < 2:
-	print 'usage: %s FILE' % (sys.argv[0], )
-	sys.exit(1)
+if __name__ == '__main__':
+	if len(sys.argv) < 2:
+		print 'usage: %s FILE' % (sys.argv[0], )
+		sys.exit(1)
 
-fname = sys.argv[1]
-ext = os.path.splitext(fname)[1][1:]
-dumper = dumpers.get(ext)
+	fname = sys.argv[1]
+	ext = os.path.splitext(fname)[1][1:]
+	loader = loaders.get(ext)
 
-if not dumper:
-	print 'Unknown file extension! Should be one of:', ', '.join('.' + ext for ext in dumpers)
-	sys.exit(1)
+	if not loader:
+		print 'Unknown file extension! Should be one of:', ', '.join('.' + ext for ext in dumpers)
+		sys.exit(1)
 
-with file(fname) as f:
-	dumper(f)
+	with file(fname) as f:
+		result = loader(f)
+		result.dump()
 

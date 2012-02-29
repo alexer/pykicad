@@ -210,8 +210,8 @@ def draw_silk(cr, items):
 			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.outline[0])**2 + (item.center[1]-item.outline[1])**2), 0, 2 * math.pi)
 		elif isinstance(item, kicad.DrawArc):
 			start_angle = math.atan2(item.start[1]-item.center[1], item.start[0]-item.center[0])
-			print item.center, item.start, math.degrees(start_angle)
-			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.start[0])**2 + (item.center[1]-item.start[1])**2), start_angle, start_angle + math.radians(item.angle/10.))
+			print item.center, item.start, math.degrees(start_angle), item.angle/10.
+			(cr.arc if item.angle >= 0 else cr.arc_negative)(item.center[0], item.center[1], math.sqrt((item.center[0]-item.start[0])**2 + (item.center[1]-item.start[1])**2), start_angle, start_angle + math.radians(item.angle/10.))
 		else:
 			raise TypeError, 'Unknown shape'
 		cr.stroke()

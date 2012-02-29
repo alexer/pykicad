@@ -185,7 +185,7 @@ def iter_module_points(mod):
 		else:
 			raise TypeError, 'Unknown shape'
 	for pad in mod.pads:
-		if pad.shape in ('rectangle', 'circle'):
+		if pad.shape in ('rectangle', 'circle', 'oval'):
 			yield pad.position[0] - pad.size[0]/2., pad.position[1] - pad.size[1]/2.
 			yield pad.position[0] + pad.size[0]/2., pad.position[1] + pad.size[1]/2.
 		else:
@@ -229,6 +229,16 @@ def draw_pads(cr, pads):
 		elif pad.shape == 'circle':
 			assert pad.size[0] == pad.size[1]
 			cr.arc(pad.position[0], pad.position[1], pad.size[0]/2., 0, 2 * math.pi)
+		elif pad.shape == 'oval':
+			r = min(pad.size)/2.
+			xsize = max(0, pad.size[0] - pad.size[1])
+			ysize = max(0, pad.size[1] - pad.size[0])
+			cr.move_to(pad.position[0] - pad.size[0]/2., pad.position[1] + ysize/2.)
+			cr.arc(pad.position[0] - xsize/2., pad.position[1] - ysize/2., r, math.pi, 3 * math.pi/2.)
+			cr.arc(pad.position[0] + xsize/2., pad.position[1] - ysize/2., r, 3 * math.pi/2., 2 * math.pi)
+			cr.arc(pad.position[0] + xsize/2., pad.position[1] + ysize/2., r, 0, math.pi/2.)
+			cr.arc(pad.position[0] - xsize/2., pad.position[1] + ysize/2., r, math.pi/2., math.pi)
+			cr.new_sub_path()
 		else:
 			raise ValueError, 'Unknown shape'
 		cr.arc(pad.position[0], pad.position[1], pad.drill_size/2., 0, 2 * math.pi)

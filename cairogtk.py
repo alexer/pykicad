@@ -11,9 +11,29 @@ import kicad
 class CairoGTK(gtk.DrawingArea):
 	# Draw in response to an expose-event
 	__gsignals__ = {'expose-event': 'override'}
-	def __init__(self, model):
+	def __init__(self, modlib, index = 0):
 		gtk.DrawingArea.__init__(self)
 
+		self.modlib = modlib
+		self.index = index
+
+		self.next_module()
+
+		#self.connect_after("realize", self._init)
+		#self.connect("configure_event", self._reshape)
+		self.connect("button_press_event", self._mouseButton)
+		self.connect("button_release_event", self._mouseButton)
+		#self.connect("motion_notify_event", self._mouseMotion)
+		self.connect("scroll_event", self._mouseScroll)
+
+		self.set_events(self.get_events() | gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK)#|gdk.POINTER_MOTION_MASK|gdk.POINTER_MOTION_HINT_MASK)
+
+	def next_module(self):
+		self.set_model(self.modlib.modules[self.index % len(self.modlib.modules)])
+		self.index += 1
+
+	def set_model(self, model):
+		print model.name
 		self.model = model
 
 		self.modelbounds = get_module_size(model)
@@ -25,15 +45,6 @@ class CairoGTK(gtk.DrawingArea):
 		self.xpos = -self.minx
 		self.ypos = -self.miny
 		self.zoomscale = 1
-
-		#self.connect_after("realize", self._init)
-		#self.connect("configure_event", self._reshape)
-		self.connect("button_press_event", self._mouseButton)
-		self.connect("button_release_event", self._mouseButton)
-		#self.connect("motion_notify_event", self._mouseMotion)
-		self.connect("scroll_event", self._mouseScroll)
-
-		self.set_events(self.get_events() | gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK)#|gdk.POINTER_MOTION_MASK|gdk.POINTER_MOTION_HINT_MASK)
 
 	def zoom(self, zamt, center):
 		self.zoomscale *= zamt
@@ -60,6 +71,10 @@ class CairoGTK(gtk.DrawingArea):
 				rel = (event.x - self.click[0], event.y - self.click[1])
 				self.click = None
 				self.pan(rel)
+		elif event.button == 2 and event.type == gdk.BUTTON_RELEASE:
+			self.next_module()
+			self._reshape()
+			self.redraw()
 		#if (event.state & gdk.BUTTON1_MASK) == gdk.BUTTON1_MASK:
 		#	currently down
 
@@ -231,11 +246,17 @@ def run(widget):
 if __name__ == "__main__":
 	import sys
 
-	library, module = sys.argv[1:3]
+	try:
+		library, module = sys.argv[1:3]
+	except:
+		library, module = sys.argv[1], None
 
 	with file(library) as f:
 		modlib = kicad.load_mod(f)
-		module = [mod for mod in modlib.modules if mod.name == module][0]
+		if module:
+			index = [ind for ind, mod in enumerate(modlib.modules) if mod.name == module][0]
+		else:
+			index = 0
 
-	run(CairoGTK(module))
+	run(CairoGTK(modlib, index))
 

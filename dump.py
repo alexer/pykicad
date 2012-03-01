@@ -380,8 +380,8 @@ class Module(Section):
 	def _load_doc(self, f, _op, *doc):
 		self.doc = ' '.join(doc)
 
-	def _load_keyword(self, f, _op, kw):
-		self.kw = kw
+	def _load_keyword(self, f, _op, *kws):
+		self.kws = kws
 
 	def _load_timestamp(self, f, _op, timestamp_):
 		if self.timestamp is None:
@@ -424,7 +424,7 @@ class Module(Section):
 		print '- Status:', ', '.join(({True: 'Locked', False: 'Not Locked'}[self.locked], {True: 'Placed', False: 'Not Placed'}[self.placed]))
 		print '- Library reference:', self.libref
 		print '- Module description:', self.doc
-		print '- Keywords to select the module in library:', self.kw
+		print '- Keywords to select the module in library:', self.kws
 		print '- AR (???) / Path (???):', self.path
 		print '- Automatic placement costs:'
 		print '  - 90 degrees rotation (Horizontal <-> Vertical):', self.r90

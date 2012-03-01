@@ -336,6 +336,7 @@ class Module(Section):
 			'At': self._load_attrs,
 			'T0': self._load_reference,
 			'T1': self._load_value,
+			'T2': self._load_text2,
 			'DS': self._load_segment,
 			'DC': self._load_circle,
 			'DA': self._load_arc,
@@ -409,6 +410,7 @@ class Module(Section):
 		return loader
 	_load_reference = _get_texte_loader('reference')
 	_load_value = _get_texte_loader('value')
+	_load_text2 = _get_texte_loader('text2')
 
 	def _load_segment(self, f, *args):
 		self.draws.append(DrawSegment.load(f, *args))

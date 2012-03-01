@@ -5,14 +5,18 @@ import gtk, gobject, cairo
 from gtk import gdk
 import math
 
+import kicad
+
 # Create a GTK+ widget on which we will draw using Cairo
 class CairoGTK(gtk.DrawingArea):
 	# Draw in response to an expose-event
 	__gsignals__ = {'expose-event': 'override'}
-	def __init__(self):
+	def __init__(self, model):
 		gtk.DrawingArea.__init__(self)
 
-		self.modelbounds = ((-1350, -1350), (1350, 1350))
+		self.model = model
+
+		self.modelbounds = get_module_size(model)
 		(self.minx, self.miny), (self.maxx, self.maxy) = self.modelbounds
 
 		self.modelsize = (self.maxx - self.minx, self.maxy - self.miny)
@@ -136,56 +140,88 @@ class CairoGTK(gtk.DrawingArea):
 		cr.rel_line_to(*cr.device_to_user_distance(20, 0))
 		cr.stroke()
 
-		draw(cr)
+		draw(cr, self.model)
 
-def draw(cr):
-	draw_pads(cr)
-	draw_silk(cr)
+def get_module_size(mod):
+	points = iter_module_points(mod)
+	minx, miny = maxx, maxy = points.next()
+	for x, y in points:
+		minx = min(minx, x)
+		miny = min(miny, y)
+		maxx = max(maxx, x)
+		maxy = max(maxy, y)
+	return (minx, miny), (maxx, maxy)
 
-def draw_silk(cr):
+def iter_module_points(mod):
+	for item in mod.draws:
+		if isinstance(item, kicad.DrawSegment):
+			(x1, y1), (x2, y2) = item.p1, item.p2
+			yield min(x1, x2) - item.width, min(y1, y2) - item.width
+			yield max(x1, x2) + item.width, max(y1, y2) + item.width
+		elif isinstance(item, kicad.DrawCircle):
+			r = math.sqrt(item.outline[0]**2 + item.outline[1]**2)
+			yield item.center[0] - r - item.width, item.center[1] - r - item.width
+			yield item.center[0] + r + item.width, item.center[1] + r + item.width
+		elif isinstance(item, kicad.DrawArc):
+			item.dump()
+			r = math.sqrt(item.start[0]**2 + item.start[1]**2)
+			yield item.center[0] - r - item.width, item.center[1] - r - item.width
+			yield item.center[0] + r + item.width, item.center[1] + r + item.width
+		else:
+			raise TypeError, 'Unknown shape'
+	for pad in mod.pads:
+		if pad.shape in ('rectangle', 'circle'):
+			yield pad.position[0] - pad.size[0]/2., pad.position[1] - pad.size[1]/2.
+			yield pad.position[0] + pad.size[0]/2., pad.position[1] + pad.size[1]/2.
+		else:
+			raise ValueError, 'Unknown shape'
+
+def draw(cr, model):
+	draw_pads(cr, model.pads)
+	draw_silk(cr, model.draws)
+
+def draw_silk(cr, items):
 	cr.set_line_cap(cairo.LINE_CAP_ROUND)
 
 	cr.push_group()
 
 	cr.set_source_rgb(0.0, 200/255., 200/255.)
-	cr.set_line_width(200); cr.move_to(-200, -300); cr.line_to(-200, 300); cr.stroke()
-	cr.set_line_width(80); cr.move_to(400, 300); cr.line_to(600, 300); cr.stroke()
-	cr.set_line_width(80); cr.move_to(500, 200); cr.line_to(500, 400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(600, 0); cr.line_to(300, 0); cr.stroke()
-	cr.set_line_width(80); cr.move_to(300, 0); cr.line_to(300, -400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(300, -400); cr.line_to(100, -400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(100, -400); cr.line_to(100, 400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(100, 400); cr.line_to(300, 400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(300, 400); cr.line_to(300, 0); cr.stroke()
-	cr.set_line_width(80); cr.move_to(-600, 0); cr.line_to(-300, 0); cr.stroke()
-	cr.set_line_width(80); cr.move_to(-300, 0); cr.line_to(-300, -400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(-300, -400); cr.line_to(-100, -400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(-100, -400); cr.line_to(-100, 400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(-100, 400); cr.line_to(-300, 400); cr.stroke()
-	cr.set_line_width(80); cr.move_to(-300, 400); cr.line_to(-300, 0); cr.stroke()
-
-	cr.set_line_width(150); cr.arc(0, 0, 1000, 0, 2 * math.pi); cr.stroke()
+	for item in items:
+		cr.set_line_width(item.width)
+		if isinstance(item, kicad.DrawSegment):
+			cr.move_to(*item.p1)
+			cr.line_to(*item.p2)
+		elif isinstance(item, kicad.DrawCircle):
+			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.outline[0])**2 + (item.center[1]-item.outline[1])**2), 0, 2 * math.pi)
+		elif isinstance(item, kicad.DrawArc):
+			start_angle = math.atan2(item.start[1], item.start[0])
+			cr.arc(item.center[0], item.center[1], math.sqrt((item.center[0]-item.start[0])**2 + (item.center[1]-item.start[1])**2), start_angle, math.radians(item.angle/10.))
+		else:
+			raise TypeError, 'Unknown shape'
+		cr.stroke()
 
 	cr.pop_group_to_source()
 	cr.paint_with_alpha(0.8)
 
-def draw_pads(cr):
+def draw_pads(cr, pads):
 	cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
 	cr.set_source_rgba(160/255., 160/255., 0.0, 0.8)
 
-	cr.rectangle(-1000 - 700/2, -700/2, 700, 700)
-	cr.arc(-1000, 0, 400/2, 0, 2 * math.pi)
-	cr.fill()
-
-	cr.arc(1000, 0, 700/2, 0, 2 * math.pi)
-	cr.arc(1000, 0, 400/2, 0, 2 * math.pi)
-	cr.fill()
+	for pad in pads:
+		if pad.shape == 'rectangle':
+			cr.rectangle(pad.position[0] - pad.size[0]/2., pad.position[1] - pad.size[1]/2., pad.size[0], pad.size[1])
+		elif pad.shape == 'circle':
+			assert pad.size[0] == pad.size[1]
+			cr.arc(pad.position[0], pad.position[1], pad.size[0]/2., 0, 2 * math.pi)
+		else:
+			raise ValueError, 'Unknown shape'
+		cr.arc(pad.position[0], pad.position[1], pad.drill_size/2., 0, 2 * math.pi)
+		cr.fill()
 
 # GTK mumbo-jumbo to show the widget in a window and quit when it's closed
-def run(Widget):
+def run(widget):
 	window = gtk.Window()
 	window.connect("delete-event", gtk.main_quit)
-	widget = Widget()
 	widget.show()
 	window.add(widget)
 	window.present()
@@ -193,5 +229,13 @@ def run(Widget):
 	gtk.main()
 
 if __name__ == "__main__":
-	run(CairoGTK)
+	import sys
+
+	library, module = sys.argv[1:3]
+
+	with file(library) as f:
+		modlib = kicad.load_mod(f)
+		module = [mod for mod in modlib.modules if mod.name == module][0]
+
+	run(CairoGTK(module))
 

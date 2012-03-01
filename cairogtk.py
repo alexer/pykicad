@@ -133,7 +133,7 @@ class CairoGTK(gtk.DrawingArea):
 
 		# Fill the background with black
 		cr.set_source_rgb(0.0, 0.0, 0.0)
-		cr.rectangle(0, 0, w, h)
+		cr.rectangle(x, y, w, h)
 		cr.fill()
 
 		cr.set_line_width(1.0)

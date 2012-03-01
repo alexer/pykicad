@@ -47,11 +47,15 @@ class CairoGTK(gtk.DrawingArea):
 		self.zoomscale = 1
 
 	def zoom(self, zamt, center):
+		cr = self.window.cairo_create()
+
 		self.zoomscale *= zamt
 
-		old_pos = self.scr2mdl(center)
+		self._reset_ctm(cr)
+		old_pos = cr.device_to_user(*center)
 		self._rescale()
-		new_pos = self.scr2mdl(center)
+		self._reset_ctm(cr)
+		new_pos = cr.device_to_user(*center)
 
 		self.xpos += new_pos[0] - old_pos[0]
 		self.ypos += new_pos[1] - old_pos[1]
@@ -59,7 +63,10 @@ class CairoGTK(gtk.DrawingArea):
 		self.redraw()
 
 	def pan(self, (xamt, yamt)):
-		self.xpos, self.ypos = (self.xpos + self.scr2mdl_l(xamt), self.ypos + self.scr2mdl_l(yamt))
+		cr = self.window.cairo_create()
+		self._reset_ctm(cr)
+		xamt2, yamt2 = cr.device_to_user_distance(xamt, yamt)
+		self.xpos, self.ypos = (self.xpos + xamt2, self.ypos + yamt2)
 
 		self.redraw()
 
@@ -99,18 +106,10 @@ class CairoGTK(gtk.DrawingArea):
 		self.modelscale = self._get_scale(self.modelsize, self.size)
 		self.scale = self.modelscale * self.zoomscale
 
-
-	def mdl2scr(self, (x, y)):
-		return ((x - self.xpos) * self.scale, (y - self.ypos) * self.scale)
-
-	def scr2mdl(self, (x, y)):
-		return (x / self.scale + self.xpos, (y / self.scale + self.ypos))
-
-	def mdl2scr_l(self, l):
-		return l * self.scale
-
-	def scr2mdl_l(self, l):
-		return l / self.scale
+	def _reset_ctm(self, cr):
+		cr.identity_matrix()
+		cr.scale(self.scale, self.scale)
+		cr.translate(self.xpos, self.ypos)
 
 
 	# Handle the expose-event by drawing
@@ -138,8 +137,7 @@ class CairoGTK(gtk.DrawingArea):
 
 		print self.xpos, self.ypos, self.zoomscale, self.scale
 
-		cr.scale(self.scale, self.scale)
-		cr.translate(self.xpos, self.ypos)
+		self._reset_ctm(cr)
 
 		cr.set_source_rgb(1.0, 0.0, 0.0)
 		cr.set_line_width(cr.device_to_user_distance(1, 1)[0])

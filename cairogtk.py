@@ -7,7 +7,6 @@ import math
 
 import kicad
 
-# Create a GTK+ widget on which we will draw using Cairo
 class CairoGTK(gtk.DrawingArea):
 	# Draw in response to an expose-event
 	__gsignals__ = {'expose-event': 'override'}
@@ -16,8 +15,6 @@ class CairoGTK(gtk.DrawingArea):
 
 		self.set_model(model)
 
-		#self.connect_after("realize", self._init)
-		#self.connect("configure_event", self._reshape)
 		self.connect("button_press_event", self._mouseButton)
 		self.connect("button_release_event", self._mouseButton)
 		#self.connect("motion_notify_event", self._mouseMotion)
@@ -82,7 +79,6 @@ class CairoGTK(gtk.DrawingArea):
 
 		self._rescale()
 
-
 	def _get_scale(self, src, dst):
 		(sw, sh) = src
 		(dw, dh) = dst
@@ -97,8 +93,6 @@ class CairoGTK(gtk.DrawingArea):
 		cr.scale(self.scale, self.scale)
 		cr.translate(self.xpos, self.ypos)
 
-
-	# Handle the expose-event by drawing
 	def do_expose_event(self, event):
 		if self.window.get_size() != self.size:
 			self._reshape()
@@ -109,7 +103,6 @@ class CairoGTK(gtk.DrawingArea):
 		self.draw(0, 0, *self.size)
 
 	def draw(self, x, y, w, h):
-		# Create the cairo context
 		cr = self.window.cairo_create()
 
 		# Restrict Cairo to the exposed area; avoid extra work
@@ -121,8 +114,7 @@ class CairoGTK(gtk.DrawingArea):
 		cr.rectangle(x, y, w, h)
 		cr.fill()
 
-		print self.xpos, self.ypos, self.zoomscale, self.scale
-
+		# Initialize coordinate transformations (panning, zooming)
 		self._reset_ctm(cr)
 
 		self.model.draw(cr)
@@ -260,7 +252,6 @@ class ModuleBrowser(CairoGTK):
 			self._reshape()
 			self.redraw()
 
-# GTK mumbo-jumbo to show the widget in a window and quit when it's closed
 def run(widget):
 	window = gtk.Window()
 	window.connect("delete-event", gtk.main_quit)

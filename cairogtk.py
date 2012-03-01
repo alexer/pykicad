@@ -136,11 +136,6 @@ class CairoGTK(gtk.DrawingArea):
 		cr.rectangle(x, y, w, h)
 		cr.fill()
 
-		cr.set_line_width(1.0)
-
-		self.raw_draw(cr)
-
-	def raw_draw(self, cr):
 		print self.xpos, self.ypos, self.zoomscale, self.scale
 
 		cr.scale(self.scale, self.scale)

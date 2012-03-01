@@ -221,8 +221,10 @@ def draw_silk(cr, items):
 
 def draw_pads(cr, pads):
 	cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
-	cr.set_source_rgba(160/255., 160/255., 0.0, 0.8)
 
+	cr.push_group()
+
+	cr.set_source_rgb(160/255., 160/255., 0.0)
 	for pad in pads:
 		cr.save()
 		cr.translate(pad.position[0], pad.position[1])
@@ -249,6 +251,9 @@ def draw_pads(cr, pads):
 		cr.restore()
 		cr.arc(pad.position[0], pad.position[1], pad.drill_size/2., 0, 2 * math.pi)
 		cr.fill()
+
+	cr.pop_group_to_source()
+	cr.paint_with_alpha(0.8)
 
 # GTK mumbo-jumbo to show the widget in a window and quit when it's closed
 def run(widget):

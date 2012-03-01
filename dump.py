@@ -333,6 +333,7 @@ class Module(Section):
 			'Sc': self._load_timestamp,
 			'AR': self._load_path,
 			'Op': self._load_cntrot,
+			'At': self._load_attrs,
 			'T0': self._load_reference,
 			'T1': self._load_value,
 			'DS': self._load_segment,
@@ -396,6 +397,9 @@ class Module(Section):
 		self.r90 = r90
 		self.r180 = r180
 		self.xxx1 = xxx
+
+	def _load_attrs(self, f, _op, *attrs):
+		self.attrs = attrs
 
 	def _get_texte_loader(name):
 		def loader(self, f, *args):

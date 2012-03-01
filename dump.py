@@ -313,7 +313,7 @@ class DrawArc(Instruction):
 		self.layer = int(layer)
 
 	def dump(self):
-		print '- Arc; center at %r, arc starts at %r, arc size %.1f°, line width %d, layer' % (self.center, self.outline, self.angle / 10., self.width), self.layer, layer_names[self.layer]
+		print '- Arc; center at %r, arc starts at %r, arc size %.1f°, line width %d, layer' % (self.center, self.start, self.angle / 10., self.width), self.layer, layer_names[self.layer]
 
 class Module(Section):
 	section_name = 'MODULE'

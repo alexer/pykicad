@@ -22,8 +22,8 @@ class CairoGTK(gtk.DrawingArea):
 		self.modelsize = (self.maxx - self.minx, self.maxy - self.miny)
 		self.modelwidth, self.modelheight = self.modelsize
 
-		self.xpos = self.maxx
-		self.ypos = self.maxy
+		self.xpos = -self.minx
+		self.ypos = -self.miny
 		self.zoomscale = 1
 
 		#self.connect_after("realize", self._init)

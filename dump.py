@@ -403,7 +403,8 @@ class Module(Section):
 
 	def _get_texte_loader(name):
 		def loader(self, f, *args):
-			assert getattr(self, name) is None
+			# XXX: Why does the standard discrete library have duplicate T0's?
+			#assert getattr(self, name) is None
 			setattr(self, name, Texte.get_loader(name)(f, *args))
 		return loader
 	_load_reference = _get_texte_loader('reference')

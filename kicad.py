@@ -580,7 +580,7 @@ if __name__ == '__main__':
 	loader = loaders.get(ext)
 
 	if not loader:
-		print 'Unknown file extension! Should be one of:', ', '.join('.' + ext for ext in dumpers)
+		print 'Unknown file extension! Should be one of:', ', '.join('.' + ext for ext in loaders)
 		sys.exit(1)
 
 	with file(fname) as f:

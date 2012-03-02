@@ -190,6 +190,7 @@ class Pad(Section):
 		self.drill_size = int(drill_x)
 
 	def _load_attribute(self, f, _op, type_, xxx_, layer_mask):
+		assert type_ in ['STD', 'SMD', 'CONN', 'HOLE'], 'Unknown pad type'
 		self.type = type_
 		self.layer_mask = int(layer_mask, 16)
 		assert xxx_ == 'N'

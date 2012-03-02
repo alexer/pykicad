@@ -382,7 +382,7 @@ class Module(Section):
 		else:
 			assert self.timestamp == int(timestamp_, 16)
 		self.locked = {'F': True, '~': False}[status_txt[0]]
-		self.placed = {'F': True, '~': False}[status_txt[1]]
+		self.placed = {'P': True, '~': False}[status_txt[1]]
 		assert len(status_txt) == 2
 
 	def _load_libref(self, f, _op, libref):

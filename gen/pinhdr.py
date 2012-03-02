@@ -3,24 +3,23 @@ import time
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import kicad
 
-# Eagle uses oval pads for single-row headers
-#pad_shape = 'oval'
-#pad_size = (600, 1200)
-#drill_size = 400
-#notch = 250
-
-# Oval pads don't fit if there's more than 1 row
-pad_shape = 'circle'
-pad_size = (600, 600)
-# For a square 0.025" pin, diameter is a bit more than 0.035"
-drill_size = 400
-notch = 200
-
 # If you change the pitch, remember to change:
 # - The basename
 # - The documentation string
 basename = 'PINHDR'
 pitch = 1000
+notch = 200
+# Oval pads don't fit if there's more than 1 row
+pad_shape = 'circle'
+pad_size = (600, 600)
+# For a square 0.025" pin, diameter is a bit more than 0.035"
+drill_size = 400
+
+# Eagle uses oval pads for single-row headers
+#pad_shape = 'oval'
+#pad_size = (600, 1200)
+#drill_size = 400
+#notch = 250
 
 def new_pad(position, name):
 	# Variable: pad.name, pad.position

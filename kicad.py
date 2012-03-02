@@ -118,6 +118,9 @@ class Instruction:
 			raise
 		return section
 
+	def save(self, f):
+		self._save(f)
+
 class Section(Instruction):
 	section_name = None
 	loaders = None
@@ -152,6 +155,11 @@ class Section(Instruction):
 	def _handle(self, result):
 		assert result is None
 
+	def save(self, f):
+		print >>f, '$' + self.section_name
+		self._save(f)
+		print >>f, '$End' + self.section_name
+
 
 class Index(Section):
 	section_name = 'INDEX'
@@ -161,6 +169,10 @@ class Index(Section):
 
 	def default_loader(self, f, *line):
 		self.module_names.append(' '.join(line))
+
+	def _save(self, f):
+		for name in self.module_names:
+			print >>f, name
 
 	def dump(self):
 		print 'Index:'
@@ -201,6 +213,15 @@ class Pad(Section):
 
 	def _load_position(self, f, _op, pos_x, pos_y):
 		self.position = int(pos_x), int(pos_y)
+
+	def _save(self, f):
+		shape = {'circle': 'C', 'rectangle': 'R', 'oval': 'O', 'trapezoid': 'T'}[self.shape]
+		assert self.type in ['STD', 'SMD', 'CONN', 'HOLE'], 'Unknown pad type'
+		print >>f, 'Sh %s %s %d %d %d %d %d' % (self.name, shape, self.size[0], self.size[1], self.dsize[0], self.dsize[1], self.orientation)
+		print >>f, 'Dr %d %d %d' % (self.drill_size, self.drill_offset[0], self.drill_offset[1])
+		print >>f, 'At %s %s %08X' % (self.type, 'N', self.layer_mask)
+		print >>f, 'Ne %d %s' % (self.net, self.net_name)
+		print >>f, 'Po %d %d' % self.position
 
 	def dump(self):
 		print '* Pad:'
@@ -243,6 +264,12 @@ class Shape3D(Section):
 	_load_offset = _get_3d_loader('offset')
 	_load_rotation = _get_3d_loader('rotation')
 
+	def _save(self, f):
+		print >>f, 'Na', self.name
+		print >>f, 'Sc %f %f %f' % self.scale
+		print >>f, 'Of %f %f %f' % self.offset
+		print >>f, 'Ro %f %f %f' % self.rotation
+
 	def dump(self):
 		print '* 3D shape:'
 		print '  - Name:', self.name
@@ -276,6 +303,13 @@ class Texte(Instruction):
 			return item
 		return loader
 
+	def _save(self, f):
+		type_ = {'reference': 0, 'value': 1, 'text2': 2}[self.name]
+		visible = {True: 'V', False: 'I'}[self.visible]
+		mirror = {True: 'M', False: 'N'}[self.mirrored]
+		style = {'italic': 'I', 'normal': 'N', None: ''}[self.style]
+		print >>f, 'T%d %d %d %d %d %d %d %s %s %d %s%s' % (type_, self.position[0], self.position[1], self.size[1], self.size[0], self.orientation, self.thickness, mirror, visible, self.layer, style, self.text)
+
 	def dump(self):
 		print '-', self.name.title(), 'text:', self.text
 		print '  - Position:', self.position
@@ -292,6 +326,9 @@ class DrawSegment(Instruction):
 		self.width = int(width)
 		self.layer = int(layer)
 
+	def _save(self, f):
+		print >>f, 'DS %d %d %d %d %d %d' % (self.p1[0], self.p1[1], self.p2[0], self.p2[1], self.width, self.layer)
+
 	def dump(self):
 		print '- Line; from %r to %r, line width %d, layer' % (self.p1, self.p2, self.width), self.layer, layer_names[self.layer]
 
@@ -301,6 +338,9 @@ class DrawCircle(Instruction):
 		self.outline = int(x2), int(y2)
 		self.width = int(width)
 		self.layer = int(layer)
+
+	def _save(self, f):
+		print >>f, 'DC %d %d %d %d %d %d' % (self.center[0], self.center[1], self.outline[0], self.outline[1], self.width, self.layer)
 
 	def dump(self):
 		print '- Circle; center at %r, outline at %r, line width %d, layer' % (self.center, self.outline, self.width), self.layer, layer_names[self.layer]
@@ -312,6 +352,9 @@ class DrawArc(Instruction):
 		self.angle = int(angle)
 		self.width = int(width)
 		self.layer = int(layer)
+
+	def _save(self, f):
+		print >>f, 'DA %d %d %d %d %d %d %d' % (self.center[0], self.center[1], self.start[0], self.start[1], self.angle, self.width, self.layer)
 
 	def dump(self):
 		print '- Arc; center at %r, arc starts at %r, arc size %.1f°, line width %d, layer' % (self.center, self.start, self.angle / 10., self.width), self.layer, layer_names[self.layer]
@@ -430,6 +473,35 @@ class Module(Section):
 	def _load_arc(self, f, *args):
 		self.draws.append(DrawArc.load(f, *args))
 
+	def save(self, f):
+		print >>f, '$' + self.section_name, self.name
+		self._save(f)
+		print >>f, '$End' + self.section_name, self.name
+
+	def _save(self, f):
+		status_txt = {True: 'F', False: '~'}[self.locked] + {True: 'P', False: '~'}[self.placed]
+		print >>f, 'Po %d %d %d %d %08X %08X %s' % (self.position[0], self.position[1], self.orientation, self.layer, self.last_edit_time, self.timestamp, status_txt)
+		print >>f, 'Li', self.libref
+		if self.doc:
+			print >>f, 'Cd', self.doc
+		if self.kws:
+			print >>f, 'Kw', ' '.join(self.kws)
+		print >>f, 'Sc %08X' % (self.timestamp, )
+		print >>f, 'AR', self.path
+		print >>f, 'Op %d %d %d' % (self.r90, self.r180, self.xxx1)
+		if self.attrs:
+			print >>f, 'At', ' '.join(self.attrs)
+		self.reference.save(f)
+		self.value.save(f)
+		if self.text2:
+			self.text2.save(f)
+		for draw in self.draws:
+			draw.save(f)
+		for pad in self.pads:
+			pad.save(f)
+		if self.shape3d:
+			self.shape3d.save(f)
+
 	def dump(self):
 		print 'Module:', self.name
 		print '- Position on board:', self.position
@@ -473,6 +545,11 @@ class ModuleLibrary(Section):
 			self.modules.append(result)
 		else:
 			raise
+
+	def _save(self, f):
+		self.index.save(f)
+		for module in self.modules:
+			module.save(f)
 
 	def dump(self):
 		self.index.dump()

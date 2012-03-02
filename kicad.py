@@ -404,9 +404,9 @@ class Module(Section):
 		self.path = ' '.join(path)
 
 	def _load_cntrot(self, f, _op, r90, r180, xxx):
-		self.r90 = r90
-		self.r180 = r180
-		self.xxx1 = xxx
+		self.r90 = int(r90)
+		self.r180 = int(r180)
+		self.xxx1 = int(xxx)
 
 	def _load_attrs(self, f, _op, *attrs):
 		self.attrs = attrs

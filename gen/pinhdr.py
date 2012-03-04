@@ -4,23 +4,38 @@ import time
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import kicad
 
-# If you change the pitch, remember to change:
-# - The basename
-# - The documentation string
-basename = 'PINHDR'
-pitch = 1000
-notch = 200
+mm2u = lambda val: val * 1000000
+um2u = lambda val: val * 1000
+
+in2u = lambda val: val * 25400000
+mil2u = lambda val: val * 25400
+
+u2mm = lambda val: val / 1000000.
+u2um = lambda val: val / 1000.
+
+u2in = lambda val: val / 25400000.
+u2mil = lambda val: val / 25400.
+
+u2kicad = lambda val: int(val / 2540.)
+p2kicad = lambda (x, y): (u2kicad(x), u2kicad(y))
+
+u2ins = lambda val: ('%f' % u2in(val)).rstrip('0') + '"'
+u2mms = lambda val: ('%f' % u2mm(val)).rstrip('0') + 'mm'
+
+# If you change the pitch, remember to check the results
+pitch = mil2u(100)
+notch = mil2u(20)
 # Oval pads don't fit if there's more than 1 row
 pad_shape = 'circle'
-pad_size = (600, 600)
+pad_size = (mil2u(60), mil2u(60))
 # For a square 0.025" pin, diameter is a bit more than 0.035"
-drill_size = 400
+drill_size = mil2u(40)
 
 # Eagle uses oval pads for single-row headers
 #pad_shape = 'oval'
-#pad_size = (600, 1200)
-#drill_size = 400
-#notch = 250
+#pad_size = (mil2u(60), mil2u(120))
+#drill_size = mil2u(40)
+#notch = mil2u(25)
 
 def new_pad(position, name):
 	# Variable: pad.name, pad.position
@@ -28,22 +43,22 @@ def new_pad(position, name):
 	pad = kicad.Pad()
 	pad.name = name
 	pad.shape = pad_shape
-	pad.size = pad_size
+	pad.size = p2kicad(pad_size)
 	pad.dsize = (0, 0)
 	pad.orientation = 0
 	pad.drill_offset = (0, 0)
-	pad.drill_size = drill_size
+	pad.drill_size = u2kicad(drill_size)
 	pad.type = 'STD'
 	pad.layer_mask = kicad.LMASK_ALL_COPPER|kicad.L_TOP_SOLDERMASK|kicad.L_BOTTOM_SOLDERMASK|kicad.L_TOP_SILKSCREEN
 	pad.net = 0
 	pad.net_name = '""'
-	pad.position = position
+	pad.position = p2kicad(position)
 	return pad
 
 def new_texte(type_, position, text):
 	txt = kicad.Texte(type_)
 	txt.text = text
-	txt.position = position
+	txt.position = p2kicad(position)
 	txt.size = (500, 500)
 	txt.orientation = 0
 	txt.thickness = 100
@@ -55,16 +70,16 @@ def new_texte(type_, position, text):
 
 def new_segment(p1, p2):
 	seg = kicad.DrawSegment()
-	seg.p1 = p1
-	seg.p2 = p2
+	seg.p1 = p2kicad(p1)
+	seg.p2 = p2kicad(p2)
 	seg.width = 80
 	seg.layer = 21
 	return seg
 
 def new_module(cols, rows = 1):
 	rowstr = {1: 'single', 2: 'double'}.get(rows, str(rows))
-	short = 'MA%02d-%d' % (cols, rows)
-	name = basename + '-' + short
+	short = 'M%02dX%d' % (cols, rows)
+	name = 'PINHDR-%s-%s-PTH-S' % (short, u2mms(pitch).upper())
 
 	pitch2 = pitch/2
 	xbase, ybase = -pitch2 * (cols - 1), -pitch2 * (rows - 1)
@@ -81,8 +96,8 @@ def new_module(cols, rows = 1):
 	mod.timestamp = 0
 	mod.locked = mod.placed = False
 	mod.libref = name
-	mod.doc = """Pin header, male, %d-pin, %s-row, straight, 0.1" spacing, 0.025" square pins""" % (cols, rowstr)
-	mod.kws = [name, 'PINHDR-MA', 'PINHDR']
+	mod.doc = """Pin header, male, %d-pin, %s-row, %s spacing, through-hole, straight, 0.025" square pins""" % (cols, rowstr, u2ins(pitch))
+	mod.kws = [name, 'PINHDR-M', 'PINHDR']
 	mod.path = ''
 	mod.r90 = mod.r180 = mod.xxx1 = 0
 	mod.attrs = []

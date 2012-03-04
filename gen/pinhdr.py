@@ -108,8 +108,8 @@ def new_module(cols, rows = 1):
 	mod.pads = []
 	mod.shape3d = None
 
-	for row in range(rows):
-		for col in range(cols):
+	for col in range(cols):
+		for row in range(rows - 1, -1, -1):
 			pad_pos = (xbase + col * pitch, ybase + row * pitch)
 			pad_name = '"%d"' % (col * rows + (rows - row), )
 			mod.pads.append(new_pad(pad_pos, pad_name))

@@ -77,7 +77,7 @@ def new_segment(p1, p2):
 	return seg
 
 def new_module(cols, rows = 1):
-	rowstr = {1: 'single', 2: 'double'}.get(rows, str(rows))
+	rowstr = {1: 'single', 2: 'double', 3: 'triple'}.get(rows, str(rows))
 	short = 'M%02dX%d' % (cols, rows)
 	name = 'PINHDR-%s-%s-PTH-S' % (short, u2mms(pitch).upper())
 
@@ -144,5 +144,5 @@ if __name__ == '__main__':
 		mod = new_module(*map(int, sys.argv[1:]))
 		save_modules(sys.stdout, mod)
 	else:
-		save_modules(sys.stdout, *[new_module(cols+1, rows+1) for cols in range(40) for rows in range(2)])
+		save_modules(sys.stdout, *[new_module(cols+1, rows+1) for cols in range(40) for rows in range(3)])
 

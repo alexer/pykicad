@@ -368,6 +368,7 @@ class Module(Section):
 		self.doc = None
 		self.kws = None
 		self.timestamp = None
+		self.timestampop = None
 		self.path = None
 		self.r90 = self.r180 = self.xxx1 = None
 		self.attrs = None
@@ -382,7 +383,7 @@ class Module(Section):
 			'Li': self._load_libref,
 			'Cd': self._load_doc,
 			'Kw': self._load_keyword,
-			'Sc': self._load_timestamp,
+			'Sc': self._load_timestampop,
 			'AR': self._load_path,
 			'Op': self._load_cntrot,
 			'At': self._load_attrs,
@@ -420,10 +421,7 @@ class Module(Section):
 		self.orientation = int(orientation)
 		self.layer = int(layer)
 		self.last_edit_time = int(last_edit_time, 16)
-		if self.timestamp is None:
-			self.timestamp = int(timestamp_, 16)
-		else:
-			assert self.timestamp == int(timestamp_, 16)
+		self.timestamp = int(timestamp_, 16)
 		self.locked = {'F': True, '~': False}[status_txt[0]]
 		self.placed = {'P': True, '~': False}[status_txt[1]]
 		assert len(status_txt) == 2
@@ -437,11 +435,8 @@ class Module(Section):
 	def _load_keyword(self, f, _op, *kws):
 		self.kws = kws
 
-	def _load_timestamp(self, f, _op, timestamp_):
-		if self.timestamp is None:
-			self.timestamp = int(timestamp_, 16)
-		else:
-			assert self.timestamp == int(timestamp_, 16)
+	def _load_timestampop(self, f, _op, timestamp_):
+		self.timestampop = int(timestamp_, 16)
 
 	def _load_path(self, f, _op, *path):
 		self.path = ' '.join(path)

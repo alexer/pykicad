@@ -1,0 +1,16 @@
+Python library for reading/writing/displaying KiCad files
+=======================================
+
+Currently only supports .mod and .emp files (module libraries)
+
+Dumping modules: python kicaddump.py gen/pinhdr.mod
+- Dumps all modules in human-readable form
+
+Viewing modules: python kicadview.py gen/pinhdr.mod
+- Move around by left-clicking and dragging
+- Zoom by using the scroll wheel
+- Switch to next module in library by clicking the middle button
+
+Module generation: python gen/pinhdr.py > pinhdr.mod
+- You can use this as example code for generating modules
+

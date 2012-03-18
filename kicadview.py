@@ -93,7 +93,10 @@ class KicadDrawing(BaseDrawing):
 			cr.translate(pad.position[0], pad.position[1])
 			cr.rotate(-math.radians(pad.orientation/10.))
 			cr.translate(-pad.position[0], -pad.position[1])
-			pad_center = pad.position[0] + pad.drill_offset[0], pad.position[1] + pad.drill_offset[1]
+			if pad.type == 'SMD':
+				pad_center = pad.position[0], pad.position[1]
+			else:
+				pad_center = pad.position[0] + pad.drill_offset[0], pad.position[1] + pad.drill_offset[1]
 			if pad.shape == 'rectangle':
 				cr.rectangle(pad_center[0] - pad.size[0]/2., pad_center[1] - pad.size[1]/2., pad.size[0], pad.size[1])
 			elif pad.shape == 'circle':
@@ -112,7 +115,8 @@ class KicadDrawing(BaseDrawing):
 			else:
 				raise ValueError, 'Unknown shape'
 			cr.restore()
-			cr.arc(pad.position[0], pad.position[1], pad.drill_size/2., 0, 2 * math.pi)
+			if pad.type != 'SMD':
+				cr.arc(pad.position[0], pad.position[1], pad.drill_size/2., 0, 2 * math.pi)
 			cr.fill()
 
 		cr.pop_group_to_source()
